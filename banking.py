@@ -51,8 +51,55 @@ class Account:
         conn.commit()
 
 
+class BankingSystem:
+    def get_balance(self, card_number):
+        cur.execute("SELECT balance FROM card WHERE number=?", (card_number,))
+        balance = cur.fetchone()[0]
+        print("\nBalance: " + str(balance) + "\n")
+
+    def add_income(self, card_number):
+        print("\nEnter income:")
+        income = int(input())
+        add_income_lst = [income, card_number]
+        cur.execute("UPDATE card SET balance=balance+? WHERE number=?", add_income_lst)
+        conn.commit()
+        print("Income was added!\n")
+
+    def do_transfer(self, card_number):
+        print("\nTransfer\nEnter card number:")
+        transfer_card_num = input()
+        cur.execute("SELECT id FROM card WHERE number=?", (transfer_card_num,))
+        transfer_card_id = cur.fetchone()
+        if card_number == transfer_card_num:
+            print("You can't transfer money to the same account!\n")
+        elif not check_luhn_algo(transfer_card_num):
+            print("Probably you made mistake in the card number. Please try again!\n")
+        elif transfer_card_id is None:
+            print("Such a card does not exist.\n")
+        else:
+            print("Enter how much money you want to transfer:")
+            transfer_amount = int(input())
+            cur.execute("SELECT balance FROM card WHERE number=?", (card_number,))
+            customer_balance = cur.fetchone()[0]
+            if transfer_amount > customer_balance:
+                print("Not enough money!\n")
+            else:
+                customer_transfer_info = [transfer_amount, card_number]
+                transfer_info = [transfer_amount, transfer_card_num]
+                cur.execute("UPDATE card SET balance=balance-? WHERE number=?", customer_transfer_info)
+                cur.execute("UPDATE card SET balance=balance+? WHERE number=?", transfer_info)
+                conn.commit()
+                print("Success!\n")
+
+    def close_account(self, card_number):
+        cur.execute("DELETE FROM card WHERE number=?", (card_number,))
+        conn.commit()
+        print("\nThe account has been closed!\n")
+
+
 using_banking_sys = True
 while using_banking_sys:
+    current_session = BankingSystem()
     print("1. Create an account")
     print("2. Log into account")
     print("0. Exit")
@@ -73,45 +120,15 @@ while using_banking_sys:
             print("\nYou have successfully logged in!\n")
             while True:
                 print("1. Balance\n2. Add income\n3. Do transfer\n4. Close account\n5. Log out\n0. Exit")
-                cur.execute("SELECT balance FROM card WHERE number=?", (card_number,))
-                customer_balance = cur.fetchone()[0]
                 logged_in_action = input()
                 if logged_in_action == "1":
-                    print("\nBalance: " + str(customer_balance) + "\n")
+                    current_session.get_balance(card_number)
                 elif logged_in_action == "2":
-                    print("\nEnter income:")
-                    income = int(input())
-                    add_income_lst = [income, card_number]
-                    cur.execute("UPDATE card SET balance=balance+? WHERE number=?", add_income_lst)
-                    conn.commit()
-                    print("Income was added!\n")
+                    current_session.add_income(card_number)
                 elif logged_in_action == "3":
-                    print("\nTransfer\nEnter card number:")
-                    transfer_card_num = input()
-                    cur.execute("SELECT id FROM card WHERE number=?", (transfer_card_num,))
-                    transfer_card_id = cur.fetchone()
-                    if card_number == transfer_card_num:
-                        print("You can't transfer money to the same account!\n")
-                    elif not check_luhn_algo(transfer_card_num):
-                        print("Probably you made mistake in the card number. Please try again!\n")
-                    elif transfer_card_id is None:
-                        print("Such a card does not exist.\n")
-                    else:
-                        print("Enter how much money you want to transfer:")
-                        transfer_amount = int(input())
-                        if transfer_amount > customer_balance:
-                            print("Not enough money!\n")
-                        else:
-                            customer_transfer_info = [transfer_amount, card_number]
-                            transfer_info = [transfer_amount, transfer_card_num]
-                            cur.execute("UPDATE card SET balance=balance-? WHERE number=?", customer_transfer_info)
-                            cur.execute("UPDATE card SET balance=balance+? WHERE number=?", transfer_info)
-                            conn.commit()
-                            print("Success!\n")
+                    current_session.do_transfer(card_number)
                 elif logged_in_action == "4":
-                    cur.execute("DELETE FROM card WHERE number=?", (card_number,))
-                    conn.commit()
-                    print("\nThe account has been closed!\n")
+                    current_session.close_account(card_number)
                     break
                 elif logged_in_action == "5":
                     print("\nYou have successfully logged out!\n")
